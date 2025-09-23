@@ -6,14 +6,14 @@
 <title>库存记录小程序</title>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 1.5em; }
-  input { padding: 12px; margin: 5px 0; font-size: 1em; width: 70%; }
-  button { padding: 12px; margin: 5px; font-size: 1em; }
-  #addRecord { background: orange; color: white; border: none; width: 100px; height: 100px; font-size: 1.2em; vertical-align: top; }
-  #controls button { font-size: 0.5em; padding: 6px; margin: 5px; }
+  input, textarea { padding: 12px; margin: 5px 0; font-size: 1.5em; width: 70%; height: 50px; }
+  button { padding: 12px; margin: 5px; font-size: 1.5em; }
+  #addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 1.5em; vertical-align: top; }
+  #controls button { font-size: 0.75em; padding: 8px; margin: 5px; }
   table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 12px; }
   th, td { border: 1px solid #ccc; padding: 6px; }
   th { background: #eee; }
-  #suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 1em; }
+  #suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 1.2em; }
   #suggestions div { padding: 6px; cursor: pointer; }
   #suggestions div:hover { background: #eee; }
   .input-wrapper { position: relative; display: inline-block; width: 70%; }
@@ -32,6 +32,9 @@
     <div>
       <input type="text" id="quantityInput" placeholder="数量（可用 12*5 等公式）">
     </div>
+    <div>
+      <input type="text" id="noteInput" placeholder="备注（可填过期日期等）">
+    </div>
   </div>
   <div>
     <button id="addRecord">添加记录</button>
@@ -49,6 +52,7 @@
 <th>产品代号</th>
 <th>产品名称</th>
 <th>数量</th>
+<th>备注</th>
 <th>操作</th>
 </tr>
 </thead>
@@ -75,15 +79,23 @@ function renderTable() {
     const tdName = document.createElement("td"); tdName.textContent = record.name; tr.appendChild(tdName);
 
     const tdQty = document.createElement("td");
-    const input = document.createElement("input"); input.type="text"; input.value=record.qty; input.style.width="100%";
-    input.onchange = () => {
-      let val = input.value;
+    const inputQty = document.createElement("input"); inputQty.type="text"; inputQty.value=record.qty; inputQty.style.width="100%";
+    inputQty.onchange = () => {
+      let val = inputQty.value;
       try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
       records[index].qty = val;
       localStorage.setItem("records", JSON.stringify(records));
       renderTable();
     };
-    tdQty.appendChild(input); tr.appendChild(tdQty);
+    tdQty.appendChild(inputQty); tr.appendChild(tdQty);
+
+    const tdNote = document.createElement("td");
+    const inputNote = document.createElement("input"); inputNote.type="text"; inputNote.value=record.note || ""; inputNote.style.width="100%";
+    inputNote.onchange = () => {
+      records[index].note = inputNote.value;
+      localStorage.setItem("records", JSON.stringify(records));
+    };
+    tdNote.appendChild(inputNote); tr.appendChild(tdNote);
 
     const tdAction = document.createElement("td");
     const delBtn = document.createElement("button"); delBtn.textContent = "删除";
@@ -113,6 +125,7 @@ searchInput.addEventListener("input", () => {
 document.getElementById("addRecord").onclick = () => {
   const searchVal = searchInput.value.trim();
   const qtyVal = document.getElementById("quantityInput").value.trim();
+  const noteVal = document.getElementById("noteInput").value.trim();
   if(!searchVal || !qtyVal){ alert("请填写产品和数量"); return; }
 
   let matchedId=null, matchedName=null;
@@ -124,17 +137,17 @@ document.getElementById("addRecord").onclick = () => {
   let finalQty = qtyVal;
   try { finalQty = eval(qtyVal.replace(/[^-()\d/*+.]/g,"")); } catch {}
 
-  records.push({id:matchedId,name:matchedName,qty:finalQty});
+  records.push({id:matchedId,name:matchedName,qty:finalQty,note:noteVal});
   localStorage.setItem("records", JSON.stringify(records));
 
-  searchInput.value=""; document.getElementById("quantityInput").value="";
+  searchInput.value=""; document.getElementById("quantityInput").value=""; document.getElementById("noteInput").value="";
   renderTable();
 };
 
 // 导出 CSV
 document.getElementById("exportCSV").onclick = () => {
-  const rows = [["产品代号","产品名称","数量"]];
-  records.forEach(r=>rows.push([r.id,r.name,r.qty]));
+  const rows = [["产品代号","产品名称","数量","备注"]];
+  records.forEach(r=>rows.push([r.id,r.name,r.qty,r.note||""]));
   const csvContent = "data:text/csv;charset=utf-8,"+rows.map(e=>e.join(",")).join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download","inventory.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
