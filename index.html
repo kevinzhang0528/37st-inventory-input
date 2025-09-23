@@ -5,18 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>库存记录小程序</title>
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 1.5em; }
-  input, textarea { padding: 12px; margin: 5px 0; font-size: 1.5em; width: 70%; height: 50px; }
-  button { padding: 12px; margin: 5px; font-size: 1.5em; }
-  #addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 1.5em; vertical-align: top; }
-  #controls button { font-size: 0.75em; padding: 8px; margin: 5px; }
-  table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 12px; }
-  th, td { border: 1px solid #ccc; padding: 6px; }
-  th { background: #eee; }
-  #suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 1.2em; }
-  #suggestions div { padding: 6px; cursor: pointer; }
-  #suggestions div:hover { background: #eee; }
-  .input-wrapper { position: relative; display: inline-block; width: 70%; }
+body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 1.5em; }
+input, textarea { padding: 12px; margin: 5px 0; font-size: 1.5em; width: 70%; height: 50px; }
+button { padding: 12px; margin: 5px; font-size: 1.5em; }
+#addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 1.5em; vertical-align: top; }
+#controls button { font-size: 0.75em; padding: 8px; margin: 5px; }
+table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px; }
+th { background: #eee; }
+#suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 1.2em; }
+#suggestions div { padding: 6px; cursor: pointer; }
+#suggestions div:hover { background: #eee; }
+.input-wrapper { position: relative; display: inline-block; width: 70%; }
+#selectedName { width: 25%; height:50px; font-size:1.5em; padding:12px; margin-left:10px; }
+.smallInput { width:100%; height:25px; font-size:0.75em; }
+.smallButton { font-size:0.75em; padding:4px 6px; }
 </style>
 </head>
 <body>
@@ -29,6 +32,7 @@
       <input type="text" id="search" placeholder="搜索产品代号或名称...">
       <div id="suggestions"></div>
     </div>
+    <input type="text" id="selectedName" placeholder="选中产品名称" readonly>
     <div>
       <input type="text" id="quantityInput" placeholder="数量（可用 12*5 等公式）">
     </div>
@@ -60,15 +64,37 @@
 </table>
 
 <script>
-// 产品列表JSON加载
 let products = {};
 let records = JSON.parse(localStorage.getItem("records") || "[]");
+
+// 加载外部JSON
 fetch("products.json")
   .then(res => res.json())
   .then(data => { products = data; renderTable(); })
   .catch(err => alert("加载产品列表失败：" + err));
 
-// 渲染表格（最新在上面，输入框小一半）
+const searchInput = document.getElementById("search");
+const suggestionsDiv = document.getElementById("suggestions");
+const selectedNameInput = document.getElementById("selectedName");
+
+// 模糊搜索
+searchInput.addEventListener("input", () => {
+  const val = searchInput.value.toLowerCase();
+  suggestionsDiv.innerHTML = "";
+  if(val==="") { selectedNameInput.value=""; return; }
+  const matches = Object.entries(products).filter(([id,name]) => id.toLowerCase().includes(val) || name.toLowerCase().includes(val)).slice(0,10);
+  matches.forEach(([id,name]) => {
+    const div = document.createElement("div"); div.textContent = `${id} - ${name}`;
+    div.onclick = () => { 
+      searchInput.value = id; 
+      selectedNameInput.value = name;
+      suggestionsDiv.innerHTML = ""; 
+    };
+    suggestionsDiv.appendChild(div);
+  });
+});
+
+// 渲染表格
 function renderTable() {
   const tbody = document.getElementById("recordTable");
   tbody.innerHTML = "";
@@ -81,11 +107,8 @@ function renderTable() {
 
     const tdQty = document.createElement("td");
     const inputQty = document.createElement("input"); 
-    inputQty.type="text"; 
-    inputQty.value=record.qty; 
-    inputQty.style.width="100%";
-    inputQty.style.height="25px"; 
-    inputQty.style.fontSize="0.75em";
+    inputQty.type="text"; inputQty.value=record.qty; 
+    inputQty.className="smallInput";
     inputQty.onchange = () => {
       let val = inputQty.value;
       try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
@@ -97,40 +120,20 @@ function renderTable() {
 
     const tdNote = document.createElement("td");
     const inputNote = document.createElement("input"); 
-    inputNote.type="text"; 
-    inputNote.value=record.note || ""; 
-    inputNote.style.width="100%";
-    inputNote.style.height="25px"; 
-    inputNote.style.fontSize="0.75em";
-    inputNote.onchange = () => {
-      records[i].note = inputNote.value;
-      localStorage.setItem("records", JSON.stringify(records));
-    };
+    inputNote.type="text"; inputNote.value=record.note||""; 
+    inputNote.className="smallInput";
+    inputNote.onchange = () => { records[i].note = inputNote.value; localStorage.setItem("records", JSON.stringify(records)); };
     tdNote.appendChild(inputNote); tr.appendChild(tdNote);
 
     const tdAction = document.createElement("td");
     const delBtn = document.createElement("button"); delBtn.textContent = "删除";
+    delBtn.className="smallButton";
     delBtn.onclick = () => { records.splice(i,1); localStorage.setItem("records", JSON.stringify(records)); renderTable(); };
     tdAction.appendChild(delBtn); tr.appendChild(tdAction);
 
     tbody.appendChild(tr);
   }
 }
-
-// 模糊搜索
-const searchInput = document.getElementById("search");
-const suggestionsDiv = document.getElementById("suggestions");
-searchInput.addEventListener("input", () => {
-  const val = searchInput.value.toLowerCase();
-  suggestionsDiv.innerHTML = "";
-  if(val==="") return;
-  const matches = Object.entries(products).filter(([id,name]) => id.toLowerCase().includes(val) || name.toLowerCase().includes(val)).slice(0,10);
-  matches.forEach(([id,name]) => {
-    const div = document.createElement("div"); div.textContent = `${id} - ${name}`;
-    div.onclick = () => { searchInput.value = id; suggestionsDiv.innerHTML = ""; };
-    suggestionsDiv.appendChild(div);
-  });
-});
 
 // 添加记录
 document.getElementById("addRecord").onclick = () => {
@@ -151,7 +154,7 @@ document.getElementById("addRecord").onclick = () => {
   records.push({id:matchedId,name:matchedName,qty:finalQty,note:noteVal});
   localStorage.setItem("records", JSON.stringify(records));
 
-  searchInput.value=""; document.getElementById("quantityInput").value=""; document.getElementById("noteInput").value="";
+  searchInput.value=""; selectedNameInput.value=""; document.getElementById("quantityInput").value=""; document.getElementById("noteInput").value="";
   renderTable();
 };
 
