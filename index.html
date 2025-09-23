@@ -68,42 +68,53 @@ fetch("products.json")
   .then(data => { products = data; renderTable(); })
   .catch(err => alert("加载产品列表失败：" + err));
 
-// 渲染表格
+// 渲染表格（最新在上面，输入框小一半）
 function renderTable() {
   const tbody = document.getElementById("recordTable");
   tbody.innerHTML = "";
-  records.forEach((record, index) => {
+  for(let i = records.length - 1; i >= 0; i--) {
+    const record = records[i];
     const tr = document.createElement("tr");
 
     const tdId = document.createElement("td"); tdId.textContent = record.id; tr.appendChild(tdId);
     const tdName = document.createElement("td"); tdName.textContent = record.name; tr.appendChild(tdName);
 
     const tdQty = document.createElement("td");
-    const inputQty = document.createElement("input"); inputQty.type="text"; inputQty.value=record.qty; inputQty.style.width="100%";
+    const inputQty = document.createElement("input"); 
+    inputQty.type="text"; 
+    inputQty.value=record.qty; 
+    inputQty.style.width="100%";
+    inputQty.style.height="25px"; 
+    inputQty.style.fontSize="0.75em";
     inputQty.onchange = () => {
       let val = inputQty.value;
       try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
-      records[index].qty = val;
+      records[i].qty = val;
       localStorage.setItem("records", JSON.stringify(records));
       renderTable();
     };
     tdQty.appendChild(inputQty); tr.appendChild(tdQty);
 
     const tdNote = document.createElement("td");
-    const inputNote = document.createElement("input"); inputNote.type="text"; inputNote.value=record.note || ""; inputNote.style.width="100%";
+    const inputNote = document.createElement("input"); 
+    inputNote.type="text"; 
+    inputNote.value=record.note || ""; 
+    inputNote.style.width="100%";
+    inputNote.style.height="25px"; 
+    inputNote.style.fontSize="0.75em";
     inputNote.onchange = () => {
-      records[index].note = inputNote.value;
+      records[i].note = inputNote.value;
       localStorage.setItem("records", JSON.stringify(records));
     };
     tdNote.appendChild(inputNote); tr.appendChild(tdNote);
 
     const tdAction = document.createElement("td");
     const delBtn = document.createElement("button"); delBtn.textContent = "删除";
-    delBtn.onclick = () => { records.splice(index,1); localStorage.setItem("records", JSON.stringify(records)); renderTable(); };
+    delBtn.onclick = () => { records.splice(i,1); localStorage.setItem("records", JSON.stringify(records)); renderTable(); };
     tdAction.appendChild(delBtn); tr.appendChild(tdAction);
 
     tbody.appendChild(tr);
-  });
+  }
 }
 
 // 模糊搜索
