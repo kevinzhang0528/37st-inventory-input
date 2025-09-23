@@ -26,7 +26,7 @@
 
 <div class="input-wrapper">
   <input type="text" id="search" placeholder="搜索产品代号或名称..." style="width: 55%;">
-  <input type="text" id="quantityInput" placeholder="数量（12*5等）">
+  <input type="text" id="quantityInput" placeholder="数量（可用 12*5 等公式）">
   <button id="addRecord" class="btn">添加记录</button>
   <div id="suggestions"></div>
 </div>
@@ -58,52 +58,48 @@ fetch("products.json")
   .then(data => { products = data; renderTable(); })
   .catch(err => alert("加载产品列表失败：" + err));
 
-// 渲染表格
+// 渲染表格（显示全部记录）
 function renderTable() {
   const tbody = document.getElementById("recordTable");
   tbody.innerHTML = "";
-  const searchVal = document.getElementById("search").value.toLowerCase();
-
   records.forEach((record, index) => {
-    if(record.id.toLowerCase().includes(searchVal) || record.name.toLowerCase().includes(searchVal)){
-      const tr = document.createElement("tr");
+    const tr = document.createElement("tr");
 
-      const tdId = document.createElement("td");
-      tdId.textContent = record.id;
-      tr.appendChild(tdId);
+    const tdId = document.createElement("td");
+    tdId.textContent = record.id;
+    tr.appendChild(tdId);
 
-      const tdName = document.createElement("td");
-      tdName.textContent = record.name;
-      tr.appendChild(tdName);
+    const tdName = document.createElement("td");
+    tdName.textContent = record.name;
+    tr.appendChild(tdName);
 
-      const tdQty = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = record.qty;
-      input.style.width = "100%";
-      input.onchange = () => {
-        let val = input.value;
-        try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
-        records[index].qty = val;
-        localStorage.setItem("records", JSON.stringify(records));
-        renderTable();
-      };
-      tdQty.appendChild(input);
-      tr.appendChild(tdQty);
+    const tdQty = document.createElement("td");
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = record.qty;
+    input.style.width = "100%";
+    input.onchange = () => {
+      let val = input.value;
+      try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
+      records[index].qty = val;
+      localStorage.setItem("records", JSON.stringify(records));
+      renderTable();
+    };
+    tdQty.appendChild(input);
+    tr.appendChild(tdQty);
 
-      const tdAction = document.createElement("td");
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "删除";
-      delBtn.onclick = () => {
-        records.splice(index,1);
-        localStorage.setItem("records", JSON.stringify(records));
-        renderTable();
-      };
-      tdAction.appendChild(delBtn);
-      tr.appendChild(tdAction);
+    const tdAction = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "删除";
+    delBtn.onclick = () => {
+      records.splice(index,1);
+      localStorage.setItem("records", JSON.stringify(records));
+      renderTable();
+    };
+    tdAction.appendChild(delBtn);
+    tr.appendChild(tdAction);
 
-      tbody.appendChild(tr);
-    }
+    tbody.appendChild(tr);
   });
 }
 
@@ -149,7 +145,11 @@ document.getElementById("addRecord").onclick = () => {
 
   records.push({id: matchedId, name: matchedName, qty: finalQty});
   localStorage.setItem("records", JSON.stringify(records));
+
+  // 清空输入框
+  searchInput.value = "";
   document.getElementById("quantityInput").value = "";
+
   renderTable();
 };
 
