@@ -1,162 +1,126 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>库存记录小程序</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    input, button { margin: 5px; padding: 8px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th { background-color: #f4f4f4; }
-    .actions button { margin: 0 2px; }
-  </style>
-</head>
-<body>
-  <h2>📦 库存记录小程序</h2>
+import React, { useState, useEffect } from "react";
+import productsData from "./products.json";
 
-  <div>
-    <label>产品代号:</label>
-    <input type="text" id="productCode" list="productList" autocomplete="off">
-    <datalist id="productList"></datalist>
-    <span id="productName" style="margin-left:10px; font-weight:bold;"></span><br>
+export default function App() {
+  const [products, setProducts] = useState({});
+  const [search, setSearch] = useState("");
+  const [quantities, setQuantities] = useState({});
 
-    <label>每箱磅数:</label>
-    <input type="number" id="weight" step="any">
+  useEffect(() => {
+    setProducts(productsData);
 
-    <label>箱数:</label>
-    <input type="number" id="boxes" step="any">
+    const savedSearch = localStorage.getItem("searchQuery");
+    if (savedSearch) setSearch(savedSearch);
 
-    <label>备注:</label>
-    <input type="text" id="remark">
+    const savedQuantities = localStorage.getItem("quantities");
+    if (savedQuantities) setQuantities(JSON.parse(savedQuantities));
+  }, []);
 
-    <button onclick="addRecord()">提交</button>
-    <button onclick="exportExcel()">导出 Excel</button>
-    <button onclick="clearAll()">清空所有</button>
-  </div>
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearch(value);
+    localStorage.setItem("searchQuery", value);
+  };
 
-  <h3>📋 记录</h3>
-  <table id="recordsTable">
-    <thead>
-      <tr>
-        <th>产品代号</th>
-        <th>产品名称</th>
-        <th>每箱磅数</th>
-        <th>箱数</th>
-        <th>合计</th>
-        <th>备注</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  const handleQuantityChange = (id, value) => {
+    let result = value;
+    try {
+      if (value.trim() !== "") {
+        result = eval(value.replace(/[^-()\d/*+.]/g, ""));
+      }
+    } catch {
+      result = value;
+    }
+    const updated = { ...quantities, [id]: result };
+    setQuantities(updated);
+    localStorage.setItem("quantities", JSON.stringify(updated));
+  };
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script>
-    let records = JSON.parse(localStorage.getItem("records")) || [];
-    let products = [];
+  const filteredProducts = Object.entries(products).filter(
+    ([id, name]) =>
+      id.toLowerCase().includes(search.toLowerCase()) ||
+      name.toLowerCase().includes(search.toLowerCase())
+  );
 
-    // 加载产品目录
-    fetch("products.json")
-      .then(res => res.json())
-      .then(data => {
-        products = data;
-        const list = document.getElementById("productList");
-        products.forEach(p => {
-          const option = document.createElement("option");
-          option.value = p.code;
-          option.textContent = p.name;
-          list.appendChild(option);
-        });
-      });
-
-    // 自动显示产品名称
-    document.getElementById("productCode").addEventListener("input", function() {
-      const code = this.value.trim();
-      const product = products.find(p => p.code.toLowerCase() === code.toLowerCase());
-      document.getElementById("productName").textContent = product ? product.name : "";
+  const exportCSV = () => {
+    const rows = [["产品代号", "产品名称", "数量"]];
+    Object.entries(quantities).forEach(([id, qty]) => {
+      if (qty !== "") rows.push([id, products[id], qty]);
     });
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      rows.map((e) => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "inventory.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-    function addRecord() {
-      const code = document.getElementById("productCode").value.trim();
-      const weight = parseFloat(document.getElementById("weight").value) || 0;
-      const boxes = parseFloat(document.getElementById("boxes").value) || 0;
-      const remark = document.getElementById("remark").value.trim();
-
-      if (!code) {
-        alert("请输入产品代号");
-        return;
-      }
-
-      const product = products.find(p => p.code.toLowerCase() === code.toLowerCase());
-      const name = product ? product.name : "";
-
-      const total = weight * boxes;
-      records.push({ code, name, weight, boxes, total, remark });
-      localStorage.setItem("records", JSON.stringify(records));
-      renderTable();
-
-      document.getElementById("productCode").value = "";
-      document.getElementById("productName").textContent = "";
-      document.getElementById("weight").value = "";
-      document.getElementById("boxes").value = "";
-      document.getElementById("remark").value = "";
+  const clearAll = () => {
+    if (confirm("确认清空所有数据吗？")) {
+      setQuantities({});
+      localStorage.removeItem("quantities");
     }
+  };
 
-    function renderTable() {
-      const tbody = document.querySelector("#recordsTable tbody");
-      tbody.innerHTML = "";
-      records.forEach((r, i) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${r.code}</td>
-          <td>${r.name}</td>
-          <td>${r.weight}</td>
-          <td>${r.boxes}</td>
-          <td>${r.total}</td>
-          <td>${r.remark}</td>
-          <td class="actions">
-            <button onclick="editRecord(${i})">编辑</button>
-            <button onclick="deleteRecord(${i})">删除</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
+  return (
+    <div className="p-6">
+      <h1 className="text-xl font-bold mb-4">库存记录</h1>
 
-    function editRecord(i) {
-      const r = records[i];
-      document.getElementById("productCode").value = r.code;
-      document.getElementById("productName").textContent = r.name;
-      document.getElementById("weight").value = r.weight;
-      document.getElementById("boxes").value = r.boxes;
-      document.getElementById("remark").value = r.remark;
-      records.splice(i, 1);
-      renderTable();
-    }
+      <input
+        type="text"
+        value={search}
+        onChange={handleSearchChange}
+        placeholder="搜索产品 ID 或名称..."
+        className="border p-2 rounded w-full mb-4"
+      />
 
-    function deleteRecord(i) {
-      records.splice(i, 1);
-      localStorage.setItem("records", JSON.stringify(records));
-      renderTable();
-    }
+      <div className="mb-4 space-x-2">
+        <button onClick={exportCSV} className="bg-green-500 text-white p-2 rounded">
+          导出 CSV
+        </button>
+        <button onClick={clearAll} className="bg-red-500 text-white p-2 rounded">
+          清空所有
+        </button>
+      </div>
 
-    function clearAll() {
-      if (confirm("确定要清空所有记录吗？")) {
-        records = [];
-        localStorage.removeItem("records");
-        renderTable();
-      }
-    }
-
-    function exportExcel() {
-      const ws = XLSX.utils.json_to_sheet(records);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "库存记录");
-      XLSX.writeFile(wb, "库存记录.xlsx");
-    }
-
-    renderTable();
-  </script>
-</body>
-</html>
+      <table className="w-full border-collapse border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border p-2 text-left">产品代号</th>
+            <th className="border p-2 text-left">产品名称</th>
+            <th className="border p-2 text-left">数量 (支持 12*5, 100/4 等)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredProducts.length > 0 ? (
+            filteredProducts.map(([id, name]) => (
+              <tr key={id}>
+                <td className="border p-2 font-mono">{id}</td>
+                <td className="border p-2">{name}</td>
+                <td className="border p-2">
+                  <input
+                    type="text"
+                    value={quantities[id] || ""}
+                    onChange={(e) => handleQuantityChange(id, e.target.value)}
+                    className="border p-1 rounded w-full"
+                    placeholder="输入数量或公式"
+                  />
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="3" className="text-gray-500 p-2">
+                没有找到相关产品
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
