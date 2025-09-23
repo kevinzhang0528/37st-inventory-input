@@ -11,13 +11,20 @@
   th, td { border: 1px solid #ccc; padding: 6px; }
   th { background: #eee; }
   .btn { cursor: pointer; }
+  #suggestions { border: 1px solid #ccc; max-height: 150px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; }
+  #suggestions div { padding: 4px; cursor: pointer; }
+  #suggestions div:hover { background: #eee; }
+  .input-wrapper { position: relative; display: inline-block; width: 60%; }
 </style>
 </head>
 <body>
 
 <h1>库存记录</h1>
 
-<input type="text" id="search" placeholder="搜索产品代号或名称..." style="width: 60%;">
+<div class="input-wrapper">
+  <input type="text" id="search" placeholder="搜索产品代号或名称..." style="width: 100%;">
+  <div id="suggestions"></div>
+</div>
 <input type="text" id="quantityInput" placeholder="数量（支持 12*5, 100/4 等）" style="width: 20%;">
 <button id="addRecord" class="btn">添加记录</button>
 <br><br>
@@ -50,10 +57,10 @@ fetch("products.json")
 function renderTable() {
   const tbody = document.getElementById("recordTable");
   tbody.innerHTML = "";
-  const search = document.getElementById("search").value.toLowerCase();
+  const searchVal = document.getElementById("search").value.toLowerCase();
 
   records.forEach((record, index) => {
-    if(record.id.toLowerCase().includes(search) || record.name.toLowerCase().includes(search)){
+    if(record.id.toLowerCase().includes(searchVal) || record.name.toLowerCase().includes(searchVal)){
       const tr = document.createElement("tr");
 
       const tdId = document.createElement("td");
@@ -71,9 +78,7 @@ function renderTable() {
       input.style.width = "100%";
       input.onchange = () => {
         let val = input.value;
-        try {
-          if(val.trim() !== "") val = eval(val.replace(/[^-()\d/*+.]/g,""));
-        } catch {}
+        try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
         records[index].qty = val;
         localStorage.setItem("records", JSON.stringify(records));
         renderTable();
@@ -85,7 +90,7 @@ function renderTable() {
       const delBtn = document.createElement("button");
       delBtn.textContent = "删除";
       delBtn.onclick = () => {
-        records.splice(index, 1);
+        records.splice(index,1);
         localStorage.setItem("records", JSON.stringify(records));
         renderTable();
       };
@@ -97,26 +102,44 @@ function renderTable() {
   });
 }
 
-// 添加记录
+// 模糊搜索建议
+const searchInput = document.getElementById("search");
+const suggestionsDiv = document.getElementById("suggestions");
+
+searchInput.addEventListener("input", () => {
+  const val = searchInput.value.toLowerCase();
+  suggestionsDiv.innerHTML = "";
+  if(val === "") return;
+  const matches = Object.entries(products)
+    .filter(([id,name]) => id.toLowerCase().includes(val) || name.toLowerCase().includes(val))
+    .slice(0, 10); // 最多10条建议
+  matches.forEach(([id,name]) => {
+    const div = document.createElement("div");
+    div.textContent = `${id} - ${name}`;
+    div.onclick = () => {
+      searchInput.value = id;
+      suggestionsDiv.innerHTML = "";
+    };
+    suggestionsDiv.appendChild(div);
+  });
+});
+
+// 点击添加记录
 document.getElementById("addRecord").onclick = () => {
-  const searchVal = document.getElementById("search").value.trim();
+  const searchVal = searchInput.value.trim();
   const qtyVal = document.getElementById("quantityInput").value.trim();
   if(!searchVal || !qtyVal){ alert("请填写产品和数量"); return; }
 
   let matchedId = null;
   let matchedName = null;
 
-  // 查找匹配产品
-  Object.entries(products).forEach(([id, name]) => {
+  Object.entries(products).forEach(([id,name]) => {
     if(id.toLowerCase() === searchVal.toLowerCase() || name.toLowerCase() === searchVal.toLowerCase()){
       matchedId = id; matchedName = name;
     }
   });
 
-  if(!matchedId){
-    alert("未找到匹配产品");
-    return;
-  }
+  if(!matchedId){ alert("未找到匹配产品"); return; }
 
   let finalQty = qtyVal;
   try { finalQty = eval(qtyVal.replace(/[^-()\d/*+.]/g,"")); } catch {}
@@ -130,12 +153,12 @@ document.getElementById("addRecord").onclick = () => {
 // 导出 CSV
 document.getElementById("exportCSV").onclick = () => {
   const rows = [["产品代号","产品名称","数量"]];
-  records.forEach(r => { rows.push([r.id, r.name, r.qty]); });
+  records.forEach(r => { rows.push([r.id,r.name,r.qty]); });
   const csvContent = "data:text/csv;charset=utf-8," + rows.map(e=>e.join(",")).join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "inventory.csv");
+  link.setAttribute("download","inventory.csv");
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -150,7 +173,7 @@ document.getElementById("clearAll").onclick = () => {
   }
 };
 
-document.getElementById("search").oninput = renderTable;
+renderTable();
 </script>
 
 </body>
