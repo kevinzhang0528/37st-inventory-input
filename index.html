@@ -1,188 +1,351 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inventory Count 37th St</title>
-<style>
-body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 2em; }
-input, textarea { padding: 12px; margin: 5px 0; font-size: 2em; width: 70%; height: 50px; }
-button { padding: 12px; margin: 5px; font-size: 2em; }
-#addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 2em; vertical-align: top; }
-#controls button { font-size: 1em; padding: 8px; margin: 5px; }
-table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 12px; }
-th, td { border: 1px solid #ccc; padding: 6px; }
-th { background: #eee; }
-#suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 2em; }
-#suggestions div { padding: 6px; cursor: pointer; }
-#suggestions div:hover { background: #eee; }
-.input-wrapper { position: relative; display: inline-block; width: 70%; }
-#selectedName { 
-    width: 100%;           /* 框变长，占页面一半宽度 */
-    height: 50px; 
-    font-size: 1em;       /* 字体稍小 */
-    padding: 12px; 
-    margin-left: 10px; 
-    white-space: nowrap;  /* 单行显示 */
-    overflow: hidden;     /* 超出部分隐藏 */
-    text-overflow: ellipsis; /* 超出显示省略号 */
-}
-.smallInput { width:100%; height:25px; font-size:1em; }
-.smallButton { font-size:1em; padding:4px 6px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventory Counter</title>
+  <!-- SheetJS for reading/writing Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root { --gap: 8px; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      max-width: 680px; margin: 0 auto; padding: 16px 14px; line-height: 1.35;
+    }
+    h1 { font-size: 1.25rem; margin: 8px 0 12px; }
+
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--gap); }
+    .row-1 { display: grid; grid-template-columns: 1fr; gap: var(--gap); }
+
+    label { font-size: 0.88em; color: #374151; margin-bottom: 4px; display: block; }
+    input, button, select { font-size: 0.9em; }
+    input[type="text"], input[type="number"], input[type="date"], input[readonly] { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; }
+    input[readonly] { background: #f9fafb; color: #4b5563; }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button { padding: 6px 10px; border-radius: 10px; border: 1px solid #d1d5db; background:#f3f4f6; cursor: pointer; font-size: 0.86em; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.small { padding: 4px 8px; font-size: 0.8em; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    .hint { font-size: 0.78em; color: #6b7280; }
+    .ok { color: #065f46; }
+    .warn { color: #b45309; }
+    .err { color: #b91c1c; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; padding: 8px 6px; font-size: 1.05em; }
+    tbody td { border-bottom: 1px solid #f3f4f6; padding: 8px 6px; font-size: 1.06em; vertical-align: top; }
+    tfoot td { padding: 8px 6px; font-size: 0.95em; color: #374151; }
+
+    .status-line { font-size: 0.82em; margin-top: 4px; }
+  </style>
 </head>
 <body>
-<div style="display:flex; align-items:flex-start;">
-  <div style="flex:1;">
-    <div class="input-wrapper">
-      <input type="text" id="search" placeholder="Inseart Item number or name...">
-      <div id="suggestions"></div>
+  <h1>Inventory Counter</h1>
+
+  <!-- Import Product Database -->
+  <section class="card">
+    <div class="row-1">
+      <div>
+        <label>Import Product Database (Excel: columns must be "Product Code", "Product Name", "Pallet Size")</label>
+        <input id="dbFile" type="file" accept=".xlsx,.xls,.csv" />
+        <div id="dbStatus" class="status-line hint">No database loaded yet.</div>
+      </div>
+      <div class="actions">
+        <button id="clearDbBtn" type="button">Clear Saved Database</button>
+      </div>
     </div>
-    <input type="text" id="selectedName" placeholder="Selected item" readonly>
-    <div>
-      <input type="text" id="quantityInput" placeholder="Quantity（Calculation support）">
+  </section>
+
+  <!-- Entry Form -->
+  <section class="card">
+    <div class="row-3">
+      <div>
+        <label for="code">Product Code</label>
+        <input id="code" type="text" placeholder="e.g. P001" autocomplete="off" />
+      </div>
+      <div>
+        <label for="name">Product Name</label>
+        <input id="name" type="text" placeholder="Auto-filled" readonly />
+      </div>
+      <div>
+        <label for="pallet">Pallet Size</label>
+        <input id="pallet" type="number" placeholder="Auto-filled" readonly />
+      </div>
     </div>
-    <div>
-      <input type="text" id="noteInput" placeholder="Memo">
+
+    <div class="row-3" style="margin-top: 8px;">
+      <div>
+        <label for="qty">Quantity</label>
+        <input id="qty" type="number" inputmode="numeric" min="0" placeholder="e.g. 50" />
+      </div>
+      <div>
+        <label for="exp">Expiry Date (optional)</label>
+        <input id="exp" type="date" />
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <div class="actions">
+          <button id="addBtn" class="primary" type="button">Add Item</button>
+          <button id="saveBtn" class="primary" type="button" style="display:none;">Save Changes</button>
+          <button id="cancelEditBtn" type="button" style="display:none;">Cancel Edit</button>
+          <button id="clearFormBtn" type="button">Clear</button>
+        </div>
+      </div>
     </div>
-  </div>
-  <div>
-    <button id="addRecord">Add Record</button>
-  </div>
-</div>
+    <div id="lookupMsg" class="status-line"></div>
+  </section>
 
-<div id="controls">
-  <button id="exportCSV">Output CSV</button>
-  <button id="clearAll" style="background:#e74c3c;color:white;">Clear All</button>
-</div>
+  <!-- Items Table -->
+  <section class="card">
+    <div class="actions" style="justify-content: space-between;">
+      <div class="hint">Locally saved automatically. Close/reopen page and your list remains.</div>
+      <div>
+        <button id="exportBtn" class="primary" type="button">Export to Excel</button>
+        <button id="clearItemsBtn" type="button">Clear Items</button>
+      </div>
+    </div>
 
-<table>
-<thead>
-<tr>
-<th>产品代号</th>
-<th>产品名称</th>
-<th>数量</th>
-<th>备注</th>
-<th>操作</th>
-</tr>
-</thead>
-<tbody id="recordTable"></tbody>
-</table>
+    <div style="overflow:auto; margin-top: 8px;">
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product Code</th>
+            <th>Product Name</th>
+            <th>Pallet Size</th>
+            <th>Quantity</th>
+            <th>Expiry Date</th>
+            <th>Recorded At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="itemsTbody"></tbody>
+        <tfoot>
+          <tr><td colspan="8" id="totalRow">Total items: 0</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
 
-<script>
-let products = {};
-let records = JSON.parse(localStorage.getItem("records") || "[]");
+  <script>
+    // ---------- State & Persistence ----------
+    const LS_KEYS = { ITEMS: 'inv_items_v1', DBMAP: 'product_db_map_v1' };
 
-// 加载外部JSON
-fetch("products.json")
-  .then(res => res.json())
-  .then(data => { products = data; renderTable(); })
-  .catch(err => alert("加载产品列表失败：" + err));
+    /** @type {Array<{code:string,name:string,palletSize:number|"",quantity:number,expiry:string,recordedAt:string}>} */
+    let items = [];
+    /** @type {Record<string,{name:string,palletSize:number}>>} */
+    let productMap = {};
 
-const searchInput = document.getElementById("search");
-const suggestionsDiv = document.getElementById("suggestions");
-const selectedNameInput = document.getElementById("selectedName");
+    let editIndex = null; // null => not editing; otherwise number index
 
-// 模糊搜索
-searchInput.addEventListener("input", () => {
-  const val = searchInput.value.toLowerCase();
-  suggestionsDiv.innerHTML = "";
-  if(val==="") { selectedNameInput.value=""; return; }
-  const matches = Object.entries(products).filter(([id,name]) => id.toLowerCase().includes(val) || name.toLowerCase().includes(val)).slice(0,10);
-  matches.forEach(([id,name]) => {
-    const div = document.createElement("div"); div.textContent = `${id} - ${name}`;
-    div.onclick = () => { 
-      searchInput.value = id; 
-      selectedNameInput.value = name;
-      suggestionsDiv.innerHTML = ""; 
-    };
-    suggestionsDiv.appendChild(div);
-  });
-});
+    const $ = (id) => document.getElementById(id);
 
-// 渲染表格
-function renderTable() {
-  const tbody = document.getElementById("recordTable");
-  tbody.innerHTML = "";
-  for(let i = records.length - 1; i >= 0; i--) {
-    const record = records[i];
-    const tr = document.createElement("tr");
-
-    const tdId = document.createElement("td"); tdId.textContent = record.id; tr.appendChild(tdId);
-    const tdName = document.createElement("td"); tdName.textContent = record.name; tr.appendChild(tdName);
-
-    const tdQty = document.createElement("td");
-    const inputQty = document.createElement("input"); 
-    inputQty.type="text"; inputQty.value=record.qty; 
-    inputQty.className="smallInput";
-    inputQty.onchange = () => {
-      let val = inputQty.value;
-      try { if(val.trim()!=="") val = eval(val.replace(/[^-()\d/*+.]/g,"")); } catch {}
-      records[i].qty = val;
-      localStorage.setItem("records", JSON.stringify(records));
+    function saveItems() {
+      localStorage.setItem(LS_KEYS.ITEMS, JSON.stringify(items));
       renderTable();
-    };
-    tdQty.appendChild(inputQty); tr.appendChild(tdQty);
+    }
 
-    const tdNote = document.createElement("td");
-    const inputNote = document.createElement("input"); 
-    inputNote.type="text"; inputNote.value=record.note||""; 
-    inputNote.className="smallInput";
-    inputNote.onchange = () => { records[i].note = inputNote.value; localStorage.setItem("records", JSON.stringify(records)); };
-    tdNote.appendChild(inputNote); tr.appendChild(tdNote);
+    function loadItems() {
+      try { const raw = localStorage.getItem(LS_KEYS.ITEMS); if (raw) items = JSON.parse(raw) || []; } catch {}
+      renderTable();
+    }
 
-    const tdAction = document.createElement("td");
-    const delBtn = document.createElement("button"); delBtn.textContent = "删除";
-    delBtn.className="smallButton";
-    delBtn.onclick = () => { records.splice(i,1); localStorage.setItem("records", JSON.stringify(records)); renderTable(); };
-    tdAction.appendChild(delBtn); tr.appendChild(tdAction);
+    function saveDbMap() { try { localStorage.setItem(LS_KEYS.DBMAP, JSON.stringify(productMap)); } catch {} }
+    function loadDbMap() {
+      try { const raw = localStorage.getItem(LS_KEYS.DBMAP); if (raw) { productMap = JSON.parse(raw) || {}; updateDbStatus(); } } catch {}
+    }
 
-    tbody.appendChild(tr);
-  }
-}
+    // ---------- UI Helpers ----------
+    function updateDbStatus(countOverride) {
+      const count = (typeof countOverride === 'number') ? countOverride : Object.keys(productMap).length;
+      if (count > 0) { $('dbStatus').textContent = `Database loaded: ${count} product(s).`; $('dbStatus').className = 'status-line ok'; }
+      else { $('dbStatus').textContent = 'No database loaded yet.'; $('dbStatus').className = 'status-line hint'; }
+    }
 
-// 添加记录
-document.getElementById("addRecord").onclick = () => {
-  const searchVal = searchInput.value.trim();
-  const qtyVal = document.getElementById("quantityInput").value.trim();
-  const noteVal = document.getElementById("noteInput").value.trim();
-  if(!searchVal || !qtyVal){ alert("请填写产品和数量"); return; }
+    function clearForm() {
+      $('code').value = '';
+      $('name').value = '';
+      $('pallet').value = '';
+      $('qty').value = '';
+      $('exp').value = '';
+      $('lookupMsg').textContent = '';
+      $('lookupMsg').className = 'status-line';
+      $('code').focus();
+    }
 
-  let matchedId=null, matchedName=null;
-  Object.entries(products).forEach(([id,name])=>{
-    if(id.toLowerCase()===searchVal.toLowerCase() || name.toLowerCase()===searchVal.toLowerCase()){ matchedId=id; matchedName=name; }
-  });
-  if(!matchedId){ alert("未找到匹配产品"); return; }
+    function exitEditMode() {
+      editIndex = null;
+      $('addBtn').style.display = '';
+      $('saveBtn').style.display = 'none';
+      $('cancelEditBtn').style.display = 'none';
+      clearForm();
+    }
 
-  let finalQty = qtyVal;
-  try { finalQty = eval(qtyVal.replace(/[^-()\d/*+.]/g,"")); } catch {}
+    function enterEditMode(index) {
+      editIndex = index;
+      const it = items[index];
+      $('code').value = it.code;
+      $('name').value = it.name;
+      $('pallet').value = it.palletSize ?? '';
+      $('qty').value = it.quantity;
+      $('exp').value = it.expiry || '';
+      $('addBtn').style.display = 'none';
+      $('saveBtn').style.display = '';
+      $('cancelEditBtn').style.display = '';
+      $('lookupMsg').textContent = 'Editing row #' + (index + 1);
+      $('lookupMsg').className = 'status-line warn';
+      $('code').focus();
+    }
 
-  records.push({id:matchedId,name:matchedName,qty:finalQty,note:noteVal});
-  localStorage.setItem("records", JSON.stringify(records));
+    function renderTable() {
+      const tbody = $('itemsTbody');
+      tbody.innerHTML = '';
+      items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${it.code}</td>
+          <td>${it.name}</td>
+          <td>${it.palletSize ?? ''}</td>
+          <td>${it.quantity}</td>
+          <td>${it.expiry || ''}</td>
+          <td>${it.recordedAt}</td>
+          <td>
+            <button class="small" data-action="edit" data-index="${idx}">Edit</button>
+            <button class="small" data-action="delete" data-index="${idx}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      $('totalRow').textContent = `Total items: ${items.length}`;
+    }
 
-  searchInput.value=""; selectedNameInput.value=""; document.getElementById("quantityInput").value=""; document.getElementById("noteInput").value="";
-  renderTable();
-};
+    // ---------- Product Lookup ----------
+    function normalizeCode(code) { return (code || '').trim(); }
+    function lookupAndFill(code) {
+      const ncode = normalizeCode(code);
+      const rec = productMap[ncode];
+      if (rec) {
+        $('name').value = rec.name || '';
+        $('pallet').value = Number(rec.palletSize || 0) || '';
+        $('lookupMsg').textContent = 'Matched from database.';
+        $('lookupMsg').className = 'status-line ok';
+      } else if (ncode) {
+        $('name').value = '';
+        $('pallet').value = '';
+        $('lookupMsg').textContent = 'Not found in database.';
+        $('lookupMsg').className = 'status-line warn';
+      } else {
+        $('lookupMsg').textContent = '';
+        $('lookupMsg').className = 'status-line';
+      }
+    }
 
-// 导出 CSV
-document.getElementById("exportCSV").onclick = () => {
-  const rows = [["code","qty","note"]];
-  records.forEach(r=>rows.push([r.id,r.qty,r.note||""]));
-  const csvContent = "data:text/csv;charset=utf-8,"+rows.map(e=>e.join(",")).join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download","inventory.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-};
+    // ---------- Excel Import ----------
+    $('dbFile').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const map = {}; let inserted = 0;
+      rows.forEach(r => {
+        const code = String(r['Product Code'] ?? '').trim(); if (!code) return;
+        const name = String(r['Product Name'] ?? '').trim();
+        const palletSizeRaw = r['Pallet Size'];
+        const palletSize = Number(palletSizeRaw === '' ? 0 : palletSizeRaw);
+        map[code] = { name, palletSize: isNaN(palletSize) ? 0 : palletSize };
+        inserted++;
+      });
+      productMap = map; saveDbMap(); updateDbStatus(inserted);
+      const cur = $('code').value; if (cur) lookupAndFill(cur);
+    });
 
-// 清空所有
-document.getElementById("clearAll").onclick = () => {
-  if(confirm("确认清空所有数据吗？")){ records=[]; localStorage.removeItem("records"); renderTable(); }
-};
+    $('clearDbBtn').addEventListener('click', () => {
+      if (confirm('Clear saved product database mapping from this browser?')) {
+        productMap = {}; localStorage.removeItem(LS_KEYS.DBMAP); updateDbStatus(0); lookupAndFill('');
+      }
+    });
 
-renderTable();
-</script>
+    // ---------- Add / Edit / Delete & Export ----------
+    $('code').addEventListener('input', (e) => lookupAndFill(e.target.value));
+    $('code').addEventListener('keypress', (e) => { if (e.key === 'Enter') $('qty').focus(); });
 
+    $('qty').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        if (editIndex !== null) $('saveBtn').click(); else $('addBtn').click();
+      }
+    });
+
+    $('clearFormBtn').addEventListener('click', clearForm);
+    $('cancelEditBtn').addEventListener('click', exitEditMode);
+
+    $('addBtn').addEventListener('click', () => {
+      const code = normalizeCode($('code').value);
+      const quantity = Number($('qty').value);
+      const expiry = $('exp').value;
+      const rec = productMap[code] || { name: '', palletSize: '' };
+      if (!code) { alert('Product Code is required.'); $('code').focus(); return; }
+      if (!Number.isFinite(quantity) || quantity <= 0) { alert('Quantity must be a positive number.'); $('qty').focus(); return; }
+      const recordedAt = new Date().toLocaleString();
+      items.push({ code, name: rec.name || '', palletSize: rec.palletSize ?? '', quantity, expiry, recordedAt });
+      saveItems(); clearForm();
+    });
+
+    $('saveBtn').addEventListener('click', () => {
+      if (editIndex === null) return;
+      const code = normalizeCode($('code').value);
+      const quantity = Number($('qty').value);
+      const expiry = $('exp').value;
+      const rec = productMap[code] || { name: '', palletSize: '' };
+      if (!code) { alert('Product Code is required.'); $('code').focus(); return; }
+      if (!Number.isFinite(quantity) || quantity <= 0) { alert('Quantity must be a positive number.'); $('qty').focus(); return; }
+      const oldRecordedAt = items[editIndex].recordedAt; // keep original timestamp
+      items[editIndex] = { code, name: rec.name || '', palletSize: rec.palletSize ?? '', quantity, expiry, recordedAt: oldRecordedAt };
+      saveItems(); exitEditMode();
+    });
+
+    $('itemsTbody').addEventListener('click', (e) => {
+      const btn = e.target.closest('button'); if (!btn) return;
+      const idx = Number(btn.getAttribute('data-index'));
+      const action = btn.getAttribute('data-action');
+      if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) return;
+      if (action === 'edit') { enterEditMode(idx); }
+      else if (action === 'delete') {
+        if (confirm('Delete this row?')) { items.splice(idx, 1); saveItems(); if (editIndex === idx) exitEditMode(); }
+      }
+    });
+
+    $('exportBtn').addEventListener('click', () => {
+      if (!items.length) { alert('No items to export.'); return; }
+      const data = items.map(it => ({
+        'Product Code': it.code,
+        'Product Name': it.name,
+        'Pallet Size': it.palletSize,
+        'Quantity': it.quantity,
+        'Expiry Date': it.expiry,
+        'Recorded At': it.recordedAt,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data, { header: ['Product Code','Product Name','Pallet Size','Quantity','Expiry Date','Recorded At'] });
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      const iso = new Date().toISOString().slice(0,10); XLSX.writeFile(wb, `inventory_${iso}.xlsx`);
+    });
+
+    $('clearItemsBtn').addEventListener('click', () => {
+      if (!items.length) return;
+      if (confirm('Clear all items from the list?')) { items = []; saveItems(); exitEditMode(); }
+    });
+
+    // ---------- Init ----------
+    loadDbMap();
+    loadItems();
+  </script>
 </body>
 </html>
-
-
-
