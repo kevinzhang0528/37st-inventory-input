@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>库存记录小程序</title>
+<title>Inventory Count 37th St</title>
 <style>
-body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 1.5em; }
-input, textarea { padding: 12px; margin: 5px 0; font-size: 1.5em; width: 70%; height: 50px; }
-button { padding: 12px; margin: 5px; font-size: 1.5em; }
-#addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 1.5em; vertical-align: top; }
-#controls button { font-size: 0.75em; padding: 8px; margin: 5px; }
+body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; font-size: 2em; }
+input, textarea { padding: 12px; margin: 5px 0; font-size: 2em; width: 70%; height: 50px; }
+button { padding: 12px; margin: 5px; font-size: 2em; }
+#addRecord { background: orange; color: white; border: none; width: 120px; height: 160px; font-size: 2em; vertical-align: top; }
+#controls button { font-size: 1em; padding: 8px; margin: 5px; }
 table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 12px; }
 th, td { border: 1px solid #ccc; padding: 6px; }
 th { background: #eee; }
-#suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 1.2em; }
+#suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; background: #fff; position: absolute; z-index: 1000; font-size: 2em; }
 #suggestions div { padding: 6px; cursor: pointer; }
 #suggestions div:hover { background: #eee; }
 .input-wrapper { position: relative; display: inline-block; width: 70%; }
@@ -27,33 +27,33 @@ th { background: #eee; }
     overflow: hidden;     /* 超出部分隐藏 */
     text-overflow: ellipsis; /* 超出显示省略号 */
 }
-.smallInput { width:100%; height:25px; font-size:0.75em; }
-.smallButton { font-size:0.75em; padding:4px 6px; }
+.smallInput { width:100%; height:25px; font-size:1em; }
+.smallButton { font-size:1em; padding:4px 6px; }
 </style>
 </head>
 <body>
 <div style="display:flex; align-items:flex-start;">
   <div style="flex:1;">
     <div class="input-wrapper">
-      <input type="text" id="search" placeholder="搜索产品代号或名称...">
+      <input type="text" id="search" placeholder="Inseart Item number or name...">
       <div id="suggestions"></div>
     </div>
-    <input type="text" id="selectedName" placeholder="选中产品名称" readonly>
+    <input type="text" id="selectedName" placeholder="Selected item" readonly>
     <div>
-      <input type="text" id="quantityInput" placeholder="数量（可用 12*5 等公式）">
+      <input type="text" id="quantityInput" placeholder="Quantity（Calculation support）">
     </div>
     <div>
-      <input type="text" id="noteInput" placeholder="备注（可填过期日期等）">
+      <input type="text" id="noteInput" placeholder="Memo">
     </div>
   </div>
   <div>
-    <button id="addRecord">添加记录</button>
+    <button id="addRecord">Add Record</button>
   </div>
 </div>
 
 <div id="controls">
-  <button id="exportCSV">导出 CSV</button>
-  <button id="clearAll" style="background:#e74c3c;color:white;">清空所有</button>
+  <button id="exportCSV">Output CSV</button>
+  <button id="clearAll" style="background:#e74c3c;color:white;">Clear All</button>
 </div>
 
 <table>
@@ -183,5 +183,6 @@ renderTable();
 
 </body>
 </html>
+
 
 
